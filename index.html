@@ -4,302 +4,568 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>📷 二維碼掃描及資料管理</title>
-  <script src="https://unpkg.com/html5-qrcode" defer></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js" defer></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" defer></script>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background:#f5f5f5; padding:20px; }
-    nav button { margin:5px; padding:8px 16px; border:none; border-radius:6px; background:#4CAF50; color:white; cursor:pointer; }
-    nav button:hover { background:#45a049; }
-    #reader, #readerQuery { max-width:350px; margin:auto; }
-    #result, #latestRecord { background:#e0ffe0; margin-top:20px; padding:10px; border-radius:8px; white-space:pre-line; }
-    .tag-button { margin:5px; padding:8px 16px; border-radius:6px; border:1px solid #4CAF50; background:white; cursor:pointer; }
-    .tag-button.active { background:#c8e6c9; }
-    .tag-panel { margin-top:15px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      background: #1a73e8;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .topbar h1 { font-size: 17px; font-weight: 600; }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    nav button {
+      padding: 7px 16px;
+      border: 1.5px solid #1a73e8;
+      border-radius: 20px;
+      background: white;
+      color: #1a73e8;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    nav button:hover { background: #e8f0fe; }
+    nav button.active { background: #1a73e8; color: white; }
+
+    .content { padding: 16px; max-width: 720px; margin: 0 auto; }
+
+    #reader, #readerQuery {
+      max-width: 360px;
+      margin: 0 auto 16px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #ddd;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5f6368;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .tag-btn-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1.5px solid #dadce0;
+      background: white;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #3c4043;
+    }
+    .tag-btn:hover { border-color: #1a73e8; color: #1a73e8; }
+    .tag-btn.active { background: #e8f0fe; border-color: #1a73e8; color: #1a73e8; font-weight: 600; }
+
+    #tagPanel { margin-top: 12px; }
+    #tagPanel label { font-size: 13px; color: #5f6368; display: block; margin-bottom: 6px; }
+    #tagPanel select, #tagPanel input[type="number"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #dadce0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #202124;
+      outline: none;
+      transition: border 0.15s;
+    }
+    #tagPanel select:focus, #tagPanel input[type="number"]:focus { border-color: #1a73e8; }
+
+    .note-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+    .note-row label { font-size: 13px; color: #5f6368; white-space: nowrap; }
+    .note-row input {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1.5px solid #dadce0;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border 0.15s;
+    }
+    .note-row input:focus { border-color: #1a73e8; }
+
+    .result-box {
+      background: #f8fffe;
+      border: 1px solid #c8e6c9;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #202124;
+      white-space: pre-line;
+    }
+    .result-box.error { background: #fef7f0; border-color: #ffcc80; }
+    .result-box.uploading { background: #e8f0fe; border-color: #90caf9; }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #5f6368;
+      margin-top: 8px;
+    }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #dadce0;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .selected-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .sel-chip {
+      background: #e8f0fe;
+      color: #1a73e8;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .loading-text { font-size: 13px; color: #9aa0a6; margin-top: 8px; }
+    #tableSection { padding: 16px; }
+    #tableSection h3 { font-size: 15px; margin-bottom: 12px; color: #202124; }
+    .dataTables_wrapper { font-size: 13px; }
   </style>
 </head>
 <body>
-  <h2>📸 二維碼掃描及資料管理</h2>
-  <nav>
-    <button onclick="switchMode('scan')">掃碼上傳</button>
-    <button onclick="switchMode('query')">掃碼查詢</button>
-    <button onclick="loadData('A4O-Tracking')">A4O資料</button>
-    <button onclick="loadData('A4I-Tracking')">A4I資料</button>
-    <button onclick="loadData('A4IO-Tracking')">A4IO資料</button>
-  </nav>
 
-  <div id="scanSection">
-    <div id="reader"></div>
-    <div id="tagButtons" style="margin-top:15px;">載入中，請稍候...</div>
-    <div id="tagPanel" class="tag-panel">請先點選標籤以顯示選項</div>
-    <div style="margin-top:10px;">
-      <label>備註：</label>
-      <input type="text" id="globalNote" placeholder="輸入備註" style="width:80%; padding:5px;">
+<div class="topbar">
+  <h1>📷 二維碼掃描及資料管理</h1>
+</div>
+
+<nav id="mainNav">
+  <button class="active" onclick="switchMode('scan', this)">掃碼上傳</button>
+  <button onclick="switchMode('query', this)">掃碼查詢</button>
+  <button onclick="loadData('A4O-Tracking', this)">A4O 資料</button>
+  <button onclick="loadData('A4I-Tracking', this)">A4I 資料</button>
+  <button onclick="loadData('A4IO-Tracking', this)">A4IO 資料</button>
+</nav>
+
+<!-- 掃碼上傳 -->
+<div id="scanSection" class="content">
+  <div id="reader"></div>
+
+  <div class="card">
+    <div class="card-title">標籤選擇</div>
+    <div id="tagButtons" class="tag-btn-wrap">
+      <span class="loading-text">載入中...</span>
     </div>
-    <div id="result">掃描結果會顯示在這裡</div>
-    <div id="latestRecord">上次紀錄會顯示在這裡</div>
-    <div id="loadingText"></div>
+    <div id="tagPanel"></div>
+    <div class="selected-summary" id="selectedSummary"></div>
   </div>
 
-  <div id="querySection" style="display:none;">
-    <div id="readerQuery"></div>
+  <div class="card">
+    <div class="card-title">額外備註</div>
+    <div class="note-row">
+      <label for="globalNote">備註</label>
+      <input type="text" id="globalNote" placeholder="輸入備註（可選）">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">掃描結果</div>
+    <div id="result" class="result-box">尚未掃描</div>
+    <div id="latestRecord" class="result-box" style="margin-top:10px; display:none;"></div>
+    <div class="status-line">
+      <div class="spinner" id="spinner"></div>
+      <span id="loadingText"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 掃碼查詢 -->
+<div id="querySection" class="content" style="display:none;">
+  <div id="readerQuery"></div>
+  <div class="card">
+    <div class="card-title">歷史紀錄</div>
     <div id="queryTable">請掃碼後查詢</div>
-    <div id="queryLoading"></div>
+    <div class="status-line">
+      <div class="spinner" id="querySpinner"></div>
+      <span id="queryLoading"></span>
+    </div>
   </div>
+</div>
 
-  <div id="tableSection" style="display:none;">
-    <h3 id="tableTitle">📄 資料列表</h3>
-    <div id="dataList"></div>
-  </div>
+<!-- 資料列表 -->
+<div id="tableSection" style="display:none; padding:16px;">
+  <h3 id="tableTitle">📄 資料列表</h3>
+  <div id="dataList"></div>
+</div>
+
+<!-- ✅ Bug 4 修正：所有外部 JS 移到 body 底部，移除 defer -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
 <script>
+// =============================================
+// 設定（保留你原本的部署網址）
+// =============================================
+const scriptUrl = "https://script.google.com/macros/s/AKfycbxLqP28nxXkZ_teyN42cwtaH3OLod7HsbvRjLv2hSR7pbnfOaOM_WVSyJi0cLDS12us/exec";
+
+// ✅ Bug 1 修正：頂層宣告，避免 switchMode() 裡出現 ReferenceError
+let scanner = null;
+let scannerQuery = null;
 let lastScanned = "";
-let currentMode = "scan";
-const scriptUrl = "https://script.google.com/macros/s/AKfycbyN49RSqSW6T4hroGFgCd0l-ql0WPl8rAIwy3hLRCtR2kbytEcaT7V_Dqik05grx_J5/exec";
+let tagData = {};
+let selectedValues = {};
 
-let tagData = {};      
-let selectedValues = {};  
-let activeTag = "";       
+// =============================================
+// 初始化
+// =============================================
+document.addEventListener("DOMContentLoaded", () => {
+  loadTags();
 
+  scanner = new Html5QrcodeScanner(
+    "reader",
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    false
+  );
+  scannerQuery = new Html5QrcodeScanner(
+    "readerQuery",
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    false
+  );
+
+  // 初始只啟動掃碼上傳
+  scanner.render(onScanSuccess, () => {});
+});
+
+// =============================================
+// 導覽列 active 狀態
+// =============================================
+function setActiveNav(btn) {
+  document.querySelectorAll("#mainNav button").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+}
+
+// ✅ Bug 2 修正：先 clear() 再 render()，避免重複初始化報錯
+async function switchMode(mode, btn) {
+  setActiveNav(btn);
+  document.getElementById("scanSection").style.display  = "none";
+  document.getElementById("querySection").style.display = "none";
+  document.getElementById("tableSection").style.display = "none";
+
+  if (mode === "scan") {
+    document.getElementById("scanSection").style.display = "block";
+    try { await scannerQuery.clear(); } catch(e) {}
+    scanner.render(onScanSuccess, () => {});
+  } else if (mode === "query") {
+    document.getElementById("querySection").style.display = "block";
+    try { await scanner.clear(); } catch(e) {}
+    scannerQuery.render(onQueryScan, () => {});
+  }
+}
+
+// =============================================
+// ItemList 標籤載入
+// =============================================
 function loadTags() {
   fetch(`${scriptUrl}?action=ItemList`)
-    .then(res => res.json())
+    .then(r => r.json())
     .then(result => {
-      if (result.status === "success" && Array.isArray(result.data)) {
-        result.data.forEach(row => {
-          const tag = row[0]?.trim();
-          const options = row.slice(1).filter(cell => cell !== "" && cell != null);
-          tagData[tag] = options;
-        });
-        renderTagButtons();
-      } else {
-        console.error("ItemList格式錯誤", result);
-        document.getElementById("tagButtons").innerText = "⚠️ 資料格式錯誤";
+      if (result.status !== "success" || !Array.isArray(result.data)) {
+        document.getElementById("tagButtons").innerHTML = "<span style='color:red'>⚠️ 讀取失敗</span>";
+        return;
       }
+      result.data.forEach(row => {
+        const tag = row[0]?.trim();
+        if (!tag) return;
+        tagData[tag] = row.slice(1).filter(c => c !== "" && c != null);
+      });
+      renderTagButtons();
     })
-    .catch(err => {
-      console.error("讀取ItemList失敗", err);
-      document.getElementById("tagButtons").innerText = "⚠️ 讀取失敗，請重整";
+    .catch(() => {
+      document.getElementById("tagButtons").innerHTML = "<span style='color:red'>⚠️ 讀取失敗，請重整</span>";
     });
 }
 
 function renderTagButtons() {
-  const btnContainer = document.getElementById("tagButtons");
-  btnContainer.innerHTML = "";
+  const wrap = document.getElementById("tagButtons");
+  wrap.innerHTML = "";
   Object.keys(tagData).forEach(tag => {
     const btn = document.createElement("button");
-    btn.className = "tag-button";
-    btn.innerText = tag;
-    btn.id = `btn-${tag}`;
+    btn.className = "tag-btn";
+    btn.textContent = tag;
+    btn.id = `tag-btn-${tag}`;
     btn.addEventListener("click", () => toggleTag(tag));
-    btnContainer.appendChild(btn);
+    wrap.appendChild(btn);
   });
 }
 
-// ⭐ POE 變輸入框的 toggleTag 函式
 function toggleTag(tag) {
-  activeTag = tag;
-  console.log(`點選標籤: ${tag}`);
-  
-  Object.keys(tagData).forEach(t => {
-    const btn = document.getElementById(`btn-${t}`);
-    if (btn) btn.classList.remove("active");
-  });
-
-  const thisBtn = document.getElementById(`btn-${tag}`);
+  document.querySelectorAll(".tag-btn").forEach(b => b.classList.remove("active"));
+  const thisBtn = document.getElementById(`tag-btn-${tag}`);
   if (thisBtn) thisBtn.classList.add("active");
 
   const panel = document.getElementById("tagPanel");
   panel.innerHTML = "";
 
-  if (!tagData[tag] || tagData[tag].length === 0) {
-    panel.innerHTML = "⚠️ 沒有選項";
-    return;
-  }
-
-  let html = `<label>${tag} 選項：</label>`;
+  const options = tagData[tag] || [];
+  const label = document.createElement("label");
+  label.textContent = `${tag} 選項：`;
+  panel.appendChild(label);
 
   if (tag === "POE") {
-    html += `<input type="number" id="input-${tag}" placeholder="請輸入數字" style="padding:5px;">`;
-  } else {
-    html += `<select id="select-${tag}"><option value="">請選擇</option>`;
-    tagData[tag].forEach(opt => {
-      html += `<option value="${opt}">${opt}</option>`;
-    });
-    html += `</select>`;
-  }
-
-  panel.innerHTML = html;
-
-  if (tag === "POE") {
-    const input = document.getElementById(`input-${tag}`);
+    const input = document.createElement("input");
+    input.type = "number";
+    input.id = `field-${tag}`;
+    input.placeholder = "請輸入數字";
     input.value = selectedValues[tag] || "";
-    input.oninput = (e) => {
+    input.addEventListener("input", e => {
       selectedValues[tag] = e.target.value;
-      console.log(`輸入 ${tag}:${e.target.value}`);
-      activeTag = "";
-    };
+      updateSummary();
+    });
+    panel.appendChild(input);
   } else {
-    const select = document.getElementById(`select-${tag}`);
-    if (selectedValues[tag]) {
-      select.value = selectedValues[tag];
-    }
-    select.onchange = (e) => {
+    const select = document.createElement("select");
+    select.id = `field-${tag}`;
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = "請選擇";
+    select.appendChild(ph);
+    options.forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt; o.textContent = opt;
+      select.appendChild(o);
+    });
+    select.value = selectedValues[tag] || "";
+    select.addEventListener("change", e => {
       selectedValues[tag] = e.target.value;
-      console.log(`選擇 ${tag}:${e.target.value}`);
-      activeTag = "";
-    };
+      updateSummary();
+    });
+    panel.appendChild(select);
   }
 }
 
+function updateSummary() {
+  const wrap = document.getElementById("selectedSummary");
+  wrap.innerHTML = "";
+  Object.entries(selectedValues).forEach(([k, v]) => {
+    if (!v) return;
+    const chip = document.createElement("span");
+    chip.className = "sel-chip";
+    chip.textContent = `${k}: ${v}`;
+    wrap.appendChild(chip);
+  });
+}
+
+// =============================================
+// 掃碼上傳
+// =============================================
 async function onScanSuccess(decodedText) {
   if (decodedText === lastScanned) return;
   lastScanned = decodedText;
-  document.getElementById('result').innerText = `📦 掃描成功：${decodedText}`;
-  document.getElementById('loadingText').innerText = "⬆️ 讀取最新資料中...";
+
+  const resultBox   = document.getElementById("result");
+  const latestBox   = document.getElementById("latestRecord");
+  const loadingText = document.getElementById("loadingText");
+  const spinner     = document.getElementById("spinner");
+
+  resultBox.className = "result-box uploading";
+  resultBox.textContent = `📦 掃描成功：${decodedText}`;
+  latestBox.style.display = "none";
+  spinner.style.display = "inline-block";
+  loadingText.textContent = "讀取最新資料中...";
 
   try {
-    const res = await fetch(`${scriptUrl}?action=LatestDataFilter&filter=${encodeURIComponent(decodedText)}`);
+    const res  = await fetch(`${scriptUrl}?action=LatestDataFilter&filter=${encodeURIComponent(decodedText)}`);
     const json = await res.json();
-    let previousNote = json?.data?.備註 || "";
-    let previousDate = json?.data?.日期 || "無";
-    document.getElementById("latestRecord").innerText = `📄 上次紀錄：${previousDate}\n備註：${previousNote || "無"}`;
 
     let previousTagValues = {};
-    if (previousNote) {
-      previousNote.split(",").forEach(pair => {
-        const [k,v] = pair.split(":");
-        if (k && v) previousTagValues[k.trim()] = v.trim();
-      });
+
+    if (json?.data) {
+      const previousDate = json.data.日期 || "無";
+      const previousNote = json.data.備註 || "";
+
+      latestBox.style.display = "block";
+      latestBox.className = "result-box";
+      latestBox.textContent = `📄 上次紀錄：${previousDate}\n備註：${previousNote || "無"}`;
+
+      // ✅ Bug 5 修正：用 indexOf(":") 切割，避免備註值含冒號時截斷錯誤
+      if (previousNote) {
+        previousNote.split(",").forEach(pair => {
+          const idx = pair.indexOf(":");
+          if (idx > 0) {
+            const k = pair.slice(0, idx).trim();
+            const v = pair.slice(idx + 1).trim();
+            if (k && v) previousTagValues[k] = v;
+          }
+        });
+      }
+    } else {
+      latestBox.style.display = "block";
+      latestBox.className = "result-box";
+      latestBox.textContent = "📄 尚無歷史紀錄";
     }
 
-    Object.keys(selectedValues).forEach(tag => {
-      if (selectedValues[tag]) {
-        previousTagValues[tag] = selectedValues[tag];
-      }
+    // 目前選擇的值覆蓋舊值
+    Object.entries(selectedValues).forEach(([k, v]) => {
+      if (v) previousTagValues[k] = v;
     });
 
-    const extraNote = document.getElementById("globalNote").value;
+    const extraNote = document.getElementById("globalNote").value.trim();
+    const tagsPart  = Object.entries(previousTagValues).map(([k, v]) => `${k}:${v}`).join(",");
+    const finalNote = tagsPart + (tagsPart && extraNote ? "," : "") + extraNote;
 
-    const tagsPart = Object.entries(previousTagValues)
-      .map(([k,v]) => `${k}:${v}`)
-      .join(", ");
+    loadingText.textContent = "上傳中...";
+    await fetch(`${scriptUrl}?action=WriteData&text=${encodeURIComponent(decodedText)}&note=${encodeURIComponent(finalNote)}`);
 
-    const finalNote = tagsPart + (tagsPart && extraNote ? ", " : "") + extraNote;
+    resultBox.className = "result-box";
+    resultBox.textContent = `✅ 已記錄：${decodedText}\n備註：${finalNote || "無"}`;
+    spinner.style.display = "none";
+    loadingText.textContent = "上傳成功";
 
-    document.getElementById('loadingText').innerText = "⬆️ 正在上傳...";
-    const up = await fetch(`${scriptUrl}?action=WriteData&text=${encodeURIComponent(decodedText)}&note=${encodeURIComponent(finalNote)}`);
-    const upText = await up.text();
-    document.getElementById('loadingText').innerText = `✅ 上傳成功：${upText}`;
-    setTimeout(() => { lastScanned = ""; }, 3000);
-  } catch(err) {
-    console.error(err);
-    document.getElementById('loadingText').innerText = `❌ 上傳失敗：${err.message}`;
+  } catch (err) {
+    resultBox.className = "result-box error";
+    resultBox.textContent = `❌ 錯誤：${err.message}`;
+    spinner.style.display = "none";
+    loadingText.textContent = "";
   }
+
+  setTimeout(() => { lastScanned = ""; }, 3000);
 }
 
+// =============================================
+// 掃碼查詢
+// =============================================
 async function onQueryScan(decodedText) {
   if (decodedText === lastScanned) return;
   lastScanned = decodedText;
-  document.getElementById("queryLoading").innerText = "🔎 查詢中...";
+
+  const querySpinner = document.getElementById("querySpinner");
+  const queryLoading = document.getElementById("queryLoading");
+
+  querySpinner.style.display = "inline-block";
+  queryLoading.textContent = "查詢中...";
+
   try {
-    const res = await fetch(`${scriptUrl}?action=DataFilter&filter=${encodeURIComponent(decodedText)}`);
+    const res  = await fetch(`${scriptUrl}?action=DataFilter&filter=${encodeURIComponent(decodedText)}`);
     const json = await res.json();
-    if (!Array.isArray(json.data) || json.data.length === 0) {
-      document.getElementById("queryTable").innerHTML = "⚠️ 沒有找到歷史紀錄";
+
+    if (!Array.isArray(json.data) || json.data.length <= 1) {
+      document.getElementById("queryTable").innerHTML =
+        `<p style="color:#5f6368; font-size:14px;">⚠️ 找不到 ${decodedText} 的歷史紀錄</p>`;
     } else {
       renderQueryTable(json.data);
     }
-    document.getElementById("queryLoading").innerText = "";
-    setTimeout(() => { lastScanned = ""; }, 3000);
   } catch (err) {
-    console.error(err);
-    document.getElementById("queryLoading").innerText = `❌ 查詢失敗：${err.message}`;
+    queryLoading.textContent = `❌ 查詢失敗：${err.message}`;
   }
+
+  querySpinner.style.display = "none";
+  queryLoading.textContent = "";
+  setTimeout(() => { lastScanned = ""; }, 3000);
 }
 
 function renderQueryTable(data) {
   const targetDiv = document.getElementById("queryTable");
-  if (!Array.isArray(data) || data.length === 0) {
-    targetDiv.innerHTML = "⚠️ 沒有資料";
-    return;
-  }
+
+  // ✅ Bug 3 修正：先 destroy() 再重建
   if ($.fn.DataTable.isDataTable("#queryDataTable")) {
     $("#queryDataTable").DataTable().destroy();
     $("#queryDataTable").empty();
   }
-  let html = `<table id="queryDataTable" class="display"><thead><tr>`;
-  data[0].forEach(th => html += `<th>${th}</th>`);
-  html += "</tr></thead><tbody>";
+
+  let html = `<table id="queryDataTable" class="display" style="width:100%"><thead><tr>`;
+  data[0].forEach(th => { html += `<th>${th}</th>`; });
+  html += `</tr></thead><tbody>`;
   data.slice(1).reverse().forEach(row => {
-    html += "<tr>";
-    row.forEach(cell => html += `<td>${cell}</td>`);
-    html += "</tr>";
+    html += `<tr>`;
+    row.forEach(cell => { html += `<td>${cell}</td>`; });
+    html += `</tr>`;
   });
-  html += "</tbody></table>";
+  html += `</tbody></table>`;
   targetDiv.innerHTML = html;
+
   $("#queryDataTable").DataTable({
     pageLength: 10,
     language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json" }
   });
 }
 
-function loadData(action) {
-  document.getElementById("scanSection").style.display = "none";
+// =============================================
+// 資料列表（A4O / A4I / A4IO）
+// =============================================
+function loadData(action, btn) {
+  setActiveNav(btn);
+  document.getElementById("scanSection").style.display  = "none";
   document.getElementById("querySection").style.display = "none";
   document.getElementById("tableSection").style.display = "block";
-  document.getElementById("tableTitle").innerText = `📄 ${action.replace("-Tracking","")} 資料`;
-  const dataList = document.getElementById("dataList");
-  dataList.innerHTML = "⌛ 載入中...";
+
+  try { scanner.clear(); } catch(e) {}
+  try { scannerQuery.clear(); } catch(e) {}
+
+  const label = action.replace("-Tracking", "");
+  document.getElementById("tableTitle").textContent = `📄 ${label} 資料`;
+  document.getElementById("dataList").innerHTML = `<p class="loading-text">⌛ 載入中...</p>`;
+
   fetch(`${scriptUrl}?action=${action}`)
-    .then(res => res.json())
-    .then(data => {
-      if (!Array.isArray(data.data) || data.data.length === 0) {
-        dataList.innerHTML = "⚠️ 沒有資料";
+    .then(r => r.json())
+    .then(result => {
+      const data = result.data;
+      if (!Array.isArray(data) || data.length <= 1) {
+        document.getElementById("dataList").innerHTML = `<p style="color:#5f6368;">⚠️ 沒有資料</p>`;
         return;
       }
-      let html = `<table id="dataTable" class="display"><thead><tr>`;
-      data.data[0].forEach((th) => html += `<th>${th}</th>`);
-      html += "</tr></thead><tbody>";
-      data.data.slice(1).reverse().forEach(row => {
-        html += "<tr>";
-        row.forEach(cell => html += `<td>${cell}</td>`);
-        html += "</tr>";
+
+      // ✅ Bug 3 修正：先 destroy() 再重建
+      if ($.fn.DataTable.isDataTable("#dataTable")) {
+        $("#dataTable").DataTable().destroy();
+        $("#dataTable").empty();
+      }
+
+      let html = `<table id="dataTable" class="display" style="width:100%"><thead><tr>`;
+      data[0].forEach(th => { html += `<th>${th}</th>`; });
+      html += `</tr></thead><tbody>`;
+      data.slice(1).reverse().forEach(row => {
+        html += `<tr>`;
+        row.forEach(cell => { html += `<td>${cell}</td>`; });
+        html += `</tr>`;
       });
-      html += "</tbody></table>";
-      dataList.innerHTML = html;
+      html += `</tbody></table>`;
+
+      document.getElementById("dataList").innerHTML = html;
       $("#dataTable").DataTable({
         pageLength: 10,
         language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json" }
       });
     })
-    .catch(err => dataList.innerHTML = `❌ 讀取失敗：${err.message}`);
+    .catch(err => {
+      document.getElementById("dataList").innerHTML = `<p style="color:red;">❌ 讀取失敗：${err.message}</p>`;
+    });
 }
-
-function switchMode(mode) {
-  currentMode = mode;
-  if (mode === "scan") {
-    document.getElementById("scanSection").style.display = "block";
-    document.getElementById("querySection").style.display = "none";
-    document.getElementById("tableSection").style.display = "none";
-    scanner.render(onScanSuccess);
-    scannerQuery.clear();
-  } else if (mode === "query") {
-    document.getElementById("scanSection").style.display = "none";
-    document.getElementById("querySection").style.display = "block";
-    document.getElementById("tableSection").style.display = "none";
-    scannerQuery.render(onQueryScan);
-    scanner.clear();
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  loadTags();
-  scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-  scannerQuery = new Html5QrcodeScanner("readerQuery", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-  scanner.render(onScanSuccess);
-});
 </script>
 </body>
 </html>
